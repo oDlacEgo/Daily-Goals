@@ -41,7 +41,7 @@
       margin-bottom: 10px;
     }
     button {
-      padding: 4px 12px;
+      padding: 6px 12px;
       background-color: #007BFF;
       color: white;
       border: none;
@@ -53,15 +53,6 @@
     button:hover {
       background-color: #0056b3;
     }
-    .product-list, .station-list {
-      margin-top: 10px;
-    }
-    .product-item, .station-item {
-      margin-bottom: 10px;
-      border: 1px solid #ccc;
-      padding: 10px;
-      border-radius: 5px;
-    }
     table {
       border-collapse: collapse;
       width: 100%;
@@ -70,8 +61,14 @@
       border: 1px solid #ccc;
     }
     th, td {
-      padding: 8px;
+      padding: 4px;
       text-align: left;
+    }
+    .station-item {
+      margin-bottom: 5px;
+      border: 1px solid #ccc;
+      padding: 5px;
+      border-radius: 5px;
     }
     .station-form {
       display: none;
@@ -83,20 +80,36 @@
     .station-form h3 {
       margin-top: 0;
     }
+    .station-form .product-list {
+      display: flex;
+      flex-direction: column; /* Produkty jeden pod drugim */
+      gap: 2px;              /* Odstępy między produktami */
+    }
     .station-form .product-row {
       display: flex;
       align-items: center;
-      margin-bottom: 5px;
+      justify-content: space-between;
+      border: 1px solid #ddd;
+      padding: 5px;
+      border-radius: 3px;
+      background-color: #f9f9f9;
     }
     .station-form .product-row span {
       flex: 1;
+      font-size: 10px;
+      margin-right: 5px;
     }
     .station-form .product-row input[type="checkbox"] {
       margin-right: 5px;
     }
     .station-form .product-row input[type="number"] {
-      width: 60px;
+      width: 50px;
+      font-size: 10px;
       margin-left: 5px;
+      text-align: center;
+    }
+    #products-section {
+      display: none; /* Domyślnie ukryta sekcja produktów */
     }
   </style>
 </head>
@@ -121,9 +134,20 @@
       </table>
 
       <h2>Produkty</h2>
-      <input type="text" id="product-name" placeholder="Nazwa produktu">
-      <button id="add-product-btn">Dodaj produkt</button>
-      <div id="product-list" class="product-list"></div>
+      <button id="toggle-products-btn">Pokaż produkty</button>
+      <div id="products-section">
+        <input type="text" id="product-name" placeholder="Nazwa produktu">
+        <button id="add-product-btn">Dodaj produkt</button>
+        <table id="product-list">
+          <thead>
+            <tr>
+              <th>Produkt</th>
+              <th>Akcje</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </div>
 
     <!-- Sekcja stacji -->
@@ -145,6 +169,7 @@
         </label>
         <div id="station-products">
           <h4>Produkty</h4>
+          <div class="product-list"></div>
         </div>
         <button id="save-station-btn">Zapisz stację</button>
         <button id="cancel-station-btn" style="background-color: #dc3545;">Anuluj</button>
@@ -157,6 +182,7 @@
     const PRODUCT_STORAGE_KEY = "products";
     const STATION_STORAGE_KEY = "stations";
 
+    // Sekcja zamówień
     function renderOrders() {
       const orders = JSON.parse(localStorage.getItem(ORDER_STORAGE_KEY)) || [];
       const tbody = document.getElementById("order-summary").querySelector("tbody");
@@ -197,38 +223,20 @@
       renderOrders();
     }
 
+    // Sekcja produkty
     function renderProducts() {
       const products = JSON.parse(localStorage.getItem(PRODUCT_STORAGE_KEY)) || [];
-      const productList = document.getElementById("product-list");
-      productList.innerHTML = "";
+      const productTableBody = document.getElementById("product-list").querySelector("tbody");
+      productTableBody.innerHTML = "";
       products.forEach((product, index) => {
-        const productItem = document.createElement("div");
-        productItem.className = "product-item";
-        productItem.innerHTML = `
-          <span>${product}</span>
-          <button onclick="removeProduct(${index})">Usuń</button>
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${product}</td>
+          <td>
+            <button onclick="removeProduct(${index})">Usuń</button>
+          </td>
         `;
-        productList.appendChild(productItem);
-      });
-    }
-
-    function renderStations() {
-      const stations = JSON.parse(localStorage.getItem(STATION_STORAGE_KEY)) || [];
-      const stationList = document.getElementById("station-container");
-      stationList.innerHTML = "";
-      stations.forEach((station, index) => {
-        const stationItem = document.createElement("div");
-        stationItem.className = "station-item";
-        stationItem.innerHTML = `
-          <h4>${station.name} (${station.hours}h)</h4>
-          <ul>
-            ${station.products.map(
-              p => `<li>${p.name} - ${p.ordersPerHour} zam./h</li>`
-            ).join("")}
-          </ul>
-          <button onclick="editStation(${index})">Edytuj</button>
-        `;
-        stationList.appendChild(stationItem);
+        productTableBody.appendChild(row);
       });
     }
 
@@ -251,36 +259,75 @@
       renderProducts();
     }
 
+    function toggleProducts() {
+      const productsSection = document.getElementById("products-section");
+      const toggleBtn = document.getElementById("toggle-products-btn");
+      if (productsSection.style.display === "none" || productsSection.style.display === "") {
+        productsSection.style.display = "block";
+        toggleBtn.textContent = "Ukryj produkty";
+      } else {
+        productsSection.style.display = "none";
+        toggleBtn.textContent = "Pokaż produkty";
+      }
+    }
+
+    // Sekcja stacje
+    function renderStations() {
+      const stations = JSON.parse(localStorage.getItem(STATION_STORAGE_KEY)) || [];
+      const stationList = document.getElementById("station-container");
+      stationList.innerHTML = "";
+      stations.forEach((station, index) => {
+        const stationItem = document.createElement("div");
+        stationItem.className = "station-item";
+        stationItem.innerHTML = `
+          <h4>${station.name} (${station.hours}h)</h4>
+          <ul>
+            ${station.products.map(
+              p => `<li>${p.name} - ${p.ordersPerHour} zam./h</li>`
+            ).join("")}
+          </ul>
+          <button onclick="editStation(${index})">Edytuj</button>
+        `;
+        stationList.appendChild(stationItem);
+      });
+    }
+
+    function editStation(index) {
+      showStationForm(index);
+    }
+
     function showStationForm(stationIndex = null) {
       const products = JSON.parse(localStorage.getItem(PRODUCT_STORAGE_KEY)) || [];
-      const stationProducts = document.getElementById("station-products");
+      const productList = document.querySelector(".product-list");
       const stations = JSON.parse(localStorage.getItem(STATION_STORAGE_KEY)) || [];
-      const stationForm = document.getElementById("station-form");
-
-      stationProducts.innerHTML = products.map(product => {
+      productList.innerHTML = "";
+      products.forEach(product => {
+        const row = document.createElement("div");
+        row.className = "product-row";
         const checked = stationIndex !== null && stations[stationIndex].products.some(p => p.name === product) ? "checked" : "";
         const quantity = stationIndex !== null ? stations[stationIndex].products.find(p => p.name === product)?.ordersPerHour || 1 : 1;
-        return `
-          <div class="product-row">
-            <span>${product}</span>
-            <input type="checkbox" data-product="${product}" ${checked}>
-            <label>Liczba zam./h:</label>
-            <input type="number" min="1" value="${quantity}" data-orders="${product}">
-          </div>
+
+        row.innerHTML = `
+          <span>${product}</span>
+          <input type="checkbox" data-product="${product}" ${checked}>
+          <label>Liczba zam./h:</label>
+          <input type="number" min="1" value="${quantity}" data-orders="${product}">
         `;
-      }).join("");
+        productList.appendChild(row);
+      });
 
       if (stationIndex !== null) {
-        document.getElementById("station-name").value = stations[stationIndex].name;
-        document.getElementById("station-hours").value = stations[stationIndex].hours;
-        stationForm.dataset.editIndex = stationIndex;
+        const station = stations[stationIndex];
+        document.getElementById("station-name").value = station.name;
+        document.getElementById("station-hours").value = station.hours;
+        document.getElementById("station-form").dataset.editIndex = stationIndex;
       } else {
         document.getElementById("station-name").value = "";
         document.getElementById("station-hours").value = "12";
-        delete stationForm.dataset.editIndex;
+        delete document.getElementById("station-form").dataset.editIndex;
       }
 
-      stationForm.style.display = "block";
+      document.getElementById("station-form").style.display = "block";
     }
 
     function saveStation() {
@@ -325,10 +372,6 @@
       document.getElementById("station-form").style.display = "none";
     }
 
-    function editStation(index) {
-      showStationForm(index);
-    }
-
     function initialize() {
       renderOrders();
       renderProducts();
@@ -338,6 +381,7 @@
     document.getElementById("process-orders").addEventListener("click", processOrders);
     document.getElementById("clear-orders").addEventListener("click", clearOrders);
     document.getElementById("add-product-btn").addEventListener("click", addProduct);
+    document.getElementById("toggle-products-btn").addEventListener("click", toggleProducts);
     document.getElementById("add-station-btn").addEventListener("click", () => showStationForm());
     document.getElementById("save-station-btn").addEventListener("click", saveStation);
     document.getElementById("cancel-station-btn").addEventListener("click", () => {
