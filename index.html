@@ -32,20 +32,23 @@
     }
     h2 {
       font-size: 12px;
-      margin-bottom: 10px;
+      margin-bottom: 5px;
     }
     textarea, input, select {
       font-size: 10px;
+      padding: 5px;
+      margin-top: 5px;
+      margin-bottom: 10px;
     }
     button {
-      padding: 4px 8px;
+      padding: 4px 12px;
       background-color: #007BFF;
       color: white;
       border: none;
       border-radius: 3px;
       cursor: pointer;
       font-size: 10px;
-      margin-right: 3px;
+      margin-right: 5px;
     }
     button:hover {
       background-color: #0056b3;
@@ -54,7 +57,10 @@
       margin-top: 10px;
     }
     .product-item, .station-item {
-      margin-bottom: 5px;
+      margin-bottom: 10px;
+      border: 1px solid #ccc;
+      padding: 10px;
+      border-radius: 5px;
     }
     table {
       border-collapse: collapse;
@@ -64,7 +70,7 @@
       border: 1px solid #ccc;
     }
     th, td {
-      padding: 5px;
+      padding: 8px;
       text-align: left;
     }
     .station-form {
@@ -89,7 +95,7 @@
       margin-right: 5px;
     }
     .station-form .product-row input[type="number"] {
-      width: 50px;
+      width: 60px;
       margin-left: 5px;
     }
   </style>
@@ -123,11 +129,11 @@
     <!-- Sekcja stacji -->
     <div class="right-section">
       <h2>Stacje</h2>
-      <button id="add-station-btn">Dodaj Stację</button>
       <div id="station-container" class="station-list"></div>
+      <button id="add-station-btn">Dodaj Stację</button>
 
       <div id="station-form" class="station-form">
-        <h3>Dodaj Stację</h3>
+        <h3>Dodaj/Edytuj Stację</h3>
         <label>
           Nazwa stacji:
           <input type="text" id="station-name">
@@ -139,7 +145,6 @@
         </label>
         <div id="station-products">
           <h4>Produkty</h4>
-          <!-- Lista produktów z checkboxami -->
         </div>
         <button id="save-station-btn">Zapisz stację</button>
         <button id="cancel-station-btn" style="background-color: #dc3545;">Anuluj</button>
@@ -160,11 +165,36 @@
         acc[order.product] = (acc[order.product] || 0) + order.quantity;
         return acc;
       }, {});
+
       for (const [product, quantity] of Object.entries(aggregatedOrders)) {
         const row = document.createElement("tr");
         row.innerHTML = `<td>${product}</td><td>${quantity}</td>`;
         tbody.appendChild(row);
       }
+    }
+
+    function processOrders() {
+      const input = document.getElementById("order-input").value.trim();
+      if (!input) {
+        alert("Brak danych zamówień do przetworzenia.");
+        return;
+      }
+
+      const orders = JSON.parse(localStorage.getItem(ORDER_STORAGE_KEY)) || [];
+      input.split("\n").forEach(line => {
+        const [product, , quantity] = line.split("\t");
+        if (product && quantity) {
+          orders.push({ product, quantity: parseInt(quantity, 10) });
+        }
+      });
+
+      localStorage.setItem(ORDER_STORAGE_KEY, JSON.stringify(orders));
+      renderOrders();
+    }
+
+    function clearOrders() {
+      localStorage.removeItem(ORDER_STORAGE_KEY);
+      renderOrders();
     }
 
     function renderProducts() {
@@ -186,7 +216,7 @@
       const stations = JSON.parse(localStorage.getItem(STATION_STORAGE_KEY)) || [];
       const stationList = document.getElementById("station-container");
       stationList.innerHTML = "";
-      stations.forEach(station => {
+      stations.forEach((station, index) => {
         const stationItem = document.createElement("div");
         stationItem.className = "station-item";
         stationItem.innerHTML = `
@@ -196,6 +226,7 @@
               p => `<li>${p.name} - ${p.ordersPerHour} zam./h</li>`
             ).join("")}
           </ul>
+          <button onclick="editStation(${index})">Edytuj</button>
         `;
         stationList.appendChild(stationItem);
       });
@@ -220,27 +251,35 @@
       renderProducts();
     }
 
-    function showStationForm() {
+    function showStationForm(stationIndex = null) {
       const products = JSON.parse(localStorage.getItem(PRODUCT_STORAGE_KEY)) || [];
       const stationProducts = document.getElementById("station-products");
+      const stations = JSON.parse(localStorage.getItem(STATION_STORAGE_KEY)) || [];
+      const stationForm = document.getElementById("station-form");
 
-      if (products.length === 0) {
-        alert("Brak dostępnych produktów. Najpierw dodaj produkty do listy.");
-        return;
+      stationProducts.innerHTML = products.map(product => {
+        const checked = stationIndex !== null && stations[stationIndex].products.some(p => p.name === product) ? "checked" : "";
+        const quantity = stationIndex !== null ? stations[stationIndex].products.find(p => p.name === product)?.ordersPerHour || 1 : 1;
+        return `
+          <div class="product-row">
+            <span>${product}</span>
+            <input type="checkbox" data-product="${product}" ${checked}>
+            <label>Liczba zam./h:</label>
+            <input type="number" min="1" value="${quantity}" data-orders="${product}">
+          </div>
+        `;
+      }).join("");
+
+      if (stationIndex !== null) {
+        document.getElementById("station-name").value = stations[stationIndex].name;
+        document.getElementById("station-hours").value = stations[stationIndex].hours;
+        stationForm.dataset.editIndex = stationIndex;
+      } else {
+        document.getElementById("station-name").value = "";
+        document.getElementById("station-hours").value = "12";
+        delete stationForm.dataset.editIndex;
       }
 
-      const productRows = products.map(product => `
-        <div class="product-row">
-          <span>${product}</span>
-          <input type="checkbox" data-product="${product}">
-          <label>Liczba zam./h:</label>
-          <input type="number" min="1" value="1" data-orders="${product}">
-        </div>
-      `).join("");
-
-      stationProducts.innerHTML = productRows;
-
-      const stationForm = document.getElementById("station-form");
       stationForm.style.display = "block";
     }
 
@@ -265,42 +304,45 @@
         }
       });
 
+      if (selectedProducts.length === 0) {
+        alert("Musisz wybrać co najmniej jeden produkt.");
+        return;
+      }
+
       const stations = JSON.parse(localStorage.getItem(STATION_STORAGE_KEY)) || [];
-      stations.push({ name: stationName, hours: stationHours, products: selectedProducts });
+      const editIndex = document.getElementById("station-form").dataset.editIndex;
+
+      const newStation = { name: stationName, hours: stationHours, products: selectedProducts };
+
+      if (editIndex !== undefined && editIndex !== "") {
+        stations[editIndex] = newStation;
+      } else {
+        stations.push(newStation);
+      }
+
       localStorage.setItem(STATION_STORAGE_KEY, JSON.stringify(stations));
       renderStations();
-
       document.getElementById("station-form").style.display = "none";
     }
 
-    document.getElementById("add-product-btn").addEventListener("click", addProduct);
-    document.getElementById("process-orders").addEventListener("click", () => {
-      const input = document.getElementById("order-input").value.trim();
-      const orders = JSON.parse(localStorage.getItem(ORDER_STORAGE_KEY)) || [];
-      input.split("\n").forEach(line => {
-        const [product, , quantity] = line.split("\t");
-        if (product && quantity) {
-          orders.push({ product, quantity: parseInt(quantity, 10) });
-        }
-      });
-      localStorage.setItem(ORDER_STORAGE_KEY, JSON.stringify(orders));
-      renderOrders();
-    });
-    document.getElementById("clear-orders").addEventListener("click", () => {
-      localStorage.removeItem(ORDER_STORAGE_KEY);
-      renderOrders();
-    });
-    document.getElementById("add-station-btn").addEventListener("click", showStationForm);
-    document.getElementById("save-station-btn").addEventListener("click", saveStation);
-    document.getElementById("cancel-station-btn").addEventListener("click", () => {
-      document.getElementById("station-form").style.display = "none";
-    });
+    function editStation(index) {
+      showStationForm(index);
+    }
 
     function initialize() {
       renderOrders();
       renderProducts();
       renderStations();
     }
+
+    document.getElementById("process-orders").addEventListener("click", processOrders);
+    document.getElementById("clear-orders").addEventListener("click", clearOrders);
+    document.getElementById("add-product-btn").addEventListener("click", addProduct);
+    document.getElementById("add-station-btn").addEventListener("click", () => showStationForm());
+    document.getElementById("save-station-btn").addEventListener("click", saveStation);
+    document.getElementById("cancel-station-btn").addEventListener("click", () => {
+      document.getElementById("station-form").style.display = "none";
+    });
 
     initialize();
   </script>
