@@ -1,1 +1,308 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>System Zarządzania</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      font-size: 10px;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      height: 100vh;
+    }
+    .container {
+      display: flex;
+      width: 100%;
+      height: 100%;
+    }
+    .left-section {
+      width: 250px;
+      flex-shrink: 0;
+      padding: 10px;
+      border-right: 1px solid #ccc;
+      overflow-y: auto;
+    }
+    .right-section {
+      flex: 1;
+      padding: 10px;
+      overflow-y: auto;
+    }
+    h2 {
+      font-size: 12px;
+      margin-bottom: 10px;
+    }
+    textarea, input, select {
+      font-size: 10px;
+    }
+    button {
+      padding: 4px 8px;
+      background-color: #007BFF;
+      color: white;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 10px;
+      margin-right: 3px;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    .product-list, .station-list {
+      margin-top: 10px;
+    }
+    .product-item, .station-item {
+      margin-bottom: 5px;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+    }
+    table, th, td {
+      border: 1px solid #ccc;
+    }
+    th, td {
+      padding: 5px;
+      text-align: left;
+    }
+    .station-form {
+      display: none;
+      margin-top: 10px;
+      border: 1px solid #ccc;
+      padding: 10px;
+      border-radius: 5px;
+    }
+    .station-form h3 {
+      margin-top: 0;
+    }
+    .station-form .product-row {
+      display: flex;
+      align-items: center;
+      margin-bottom: 5px;
+    }
+    .station-form .product-row span {
+      flex: 1;
+    }
+    .station-form .product-row input[type="checkbox"] {
+      margin-right: 5px;
+    }
+    .station-form .product-row input[type="number"] {
+      width: 50px;
+      margin-left: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Sekcja zamówień i produktów -->
+    <div class="left-section">
+      <h2>Zamówienia</h2>
+      <textarea id="order-input" placeholder="Wklej tutaj dane zamówień w formacie: Produkt[TAB]Data[TAB]Ilość"></textarea>
+      <div>
+        <button id="process-orders">Przetwórz zamówienia</button>
+        <button id="clear-orders" style="background-color: #dc3545;">Usuń dane</button>
+      </div>
+      <table id="order-summary">
+        <thead>
+          <tr>
+            <th>Produkt</th>
+            <th>Ilość</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
 
+      <h2>Produkty</h2>
+      <input type="text" id="product-name" placeholder="Nazwa produktu">
+      <button id="add-product-btn">Dodaj produkt</button>
+      <div id="product-list" class="product-list"></div>
+    </div>
+
+    <!-- Sekcja stacji -->
+    <div class="right-section">
+      <h2>Stacje</h2>
+      <button id="add-station-btn">Dodaj Stację</button>
+      <div id="station-container" class="station-list"></div>
+
+      <div id="station-form" class="station-form">
+        <h3>Dodaj Stację</h3>
+        <label>
+          Nazwa stacji:
+          <input type="text" id="station-name">
+        </label>
+        <br>
+        <label>
+          Liczba godzin pracy:
+          <input type="number" id="station-hours" value="12" min="1" max="24">
+        </label>
+        <div id="station-products">
+          <h4>Produkty</h4>
+          <!-- Lista produktów z checkboxami -->
+        </div>
+        <button id="save-station-btn">Zapisz stację</button>
+        <button id="cancel-station-btn" style="background-color: #dc3545;">Anuluj</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const ORDER_STORAGE_KEY = "orders";
+    const PRODUCT_STORAGE_KEY = "products";
+    const STATION_STORAGE_KEY = "stations";
+
+    function renderOrders() {
+      const orders = JSON.parse(localStorage.getItem(ORDER_STORAGE_KEY)) || [];
+      const tbody = document.getElementById("order-summary").querySelector("tbody");
+      tbody.innerHTML = "";
+      const aggregatedOrders = orders.reduce((acc, order) => {
+        acc[order.product] = (acc[order.product] || 0) + order.quantity;
+        return acc;
+      }, {});
+      for (const [product, quantity] of Object.entries(aggregatedOrders)) {
+        const row = document.createElement("tr");
+        row.innerHTML = `<td>${product}</td><td>${quantity}</td>`;
+        tbody.appendChild(row);
+      }
+    }
+
+    function renderProducts() {
+      const products = JSON.parse(localStorage.getItem(PRODUCT_STORAGE_KEY)) || [];
+      const productList = document.getElementById("product-list");
+      productList.innerHTML = "";
+      products.forEach((product, index) => {
+        const productItem = document.createElement("div");
+        productItem.className = "product-item";
+        productItem.innerHTML = `
+          <span>${product}</span>
+          <button onclick="removeProduct(${index})">Usuń</button>
+        `;
+        productList.appendChild(productItem);
+      });
+    }
+
+    function renderStations() {
+      const stations = JSON.parse(localStorage.getItem(STATION_STORAGE_KEY)) || [];
+      const stationList = document.getElementById("station-container");
+      stationList.innerHTML = "";
+      stations.forEach(station => {
+        const stationItem = document.createElement("div");
+        stationItem.className = "station-item";
+        stationItem.innerHTML = `
+          <h4>${station.name} (${station.hours}h)</h4>
+          <ul>
+            ${station.products.map(
+              p => `<li>${p.name} - ${p.ordersPerHour} zam./h</li>`
+            ).join("")}
+          </ul>
+        `;
+        stationList.appendChild(stationItem);
+      });
+    }
+
+    function addProduct() {
+      const productName = document.getElementById("product-name").value.trim();
+      if (!productName) return;
+      const products = JSON.parse(localStorage.getItem(PRODUCT_STORAGE_KEY)) || [];
+      if (!products.includes(productName)) {
+        products.push(productName);
+        localStorage.setItem(PRODUCT_STORAGE_KEY, JSON.stringify(products));
+        renderProducts();
+      }
+      document.getElementById("product-name").value = "";
+    }
+
+    function removeProduct(index) {
+      const products = JSON.parse(localStorage.getItem(PRODUCT_STORAGE_KEY)) || [];
+      products.splice(index, 1);
+      localStorage.setItem(PRODUCT_STORAGE_KEY, JSON.stringify(products));
+      renderProducts();
+    }
+
+    function showStationForm() {
+      const products = JSON.parse(localStorage.getItem(PRODUCT_STORAGE_KEY)) || [];
+      const stationProducts = document.getElementById("station-products");
+
+      if (products.length === 0) {
+        alert("Brak dostępnych produktów. Najpierw dodaj produkty do listy.");
+        return;
+      }
+
+      const productRows = products.map(product => `
+        <div class="product-row">
+          <span>${product}</span>
+          <input type="checkbox" data-product="${product}">
+          <label>Liczba zam./h:</label>
+          <input type="number" min="1" value="1" data-orders="${product}">
+        </div>
+      `).join("");
+
+      stationProducts.innerHTML = productRows;
+
+      const stationForm = document.getElementById("station-form");
+      stationForm.style.display = "block";
+    }
+
+    function saveStation() {
+      const stationName = document.getElementById("station-name").value.trim();
+      const stationHours = parseInt(document.getElementById("station-hours").value, 10);
+
+      if (!stationName || stationHours < 1) {
+        alert("Podaj poprawną nazwę stacji i liczbę godzin pracy.");
+        return;
+      }
+
+      const selectedProducts = [];
+      document.querySelectorAll("#station-products .product-row").forEach(row => {
+        const checkbox = row.querySelector('input[type="checkbox"]');
+        const ordersInput = row.querySelector('input[type="number"]');
+        if (checkbox.checked) {
+          selectedProducts.push({
+            name: checkbox.dataset.product,
+            ordersPerHour: parseInt(ordersInput.value, 10)
+          });
+        }
+      });
+
+      const stations = JSON.parse(localStorage.getItem(STATION_STORAGE_KEY)) || [];
+      stations.push({ name: stationName, hours: stationHours, products: selectedProducts });
+      localStorage.setItem(STATION_STORAGE_KEY, JSON.stringify(stations));
+      renderStations();
+
+      document.getElementById("station-form").style.display = "none";
+    }
+
+    document.getElementById("add-product-btn").addEventListener("click", addProduct);
+    document.getElementById("process-orders").addEventListener("click", () => {
+      const input = document.getElementById("order-input").value.trim();
+      const orders = JSON.parse(localStorage.getItem(ORDER_STORAGE_KEY)) || [];
+      input.split("\n").forEach(line => {
+        const [product, , quantity] = line.split("\t");
+        if (product && quantity) {
+          orders.push({ product, quantity: parseInt(quantity, 10) });
+        }
+      });
+      localStorage.setItem(ORDER_STORAGE_KEY, JSON.stringify(orders));
+      renderOrders();
+    });
+    document.getElementById("clear-orders").addEventListener("click", () => {
+      localStorage.removeItem(ORDER_STORAGE_KEY);
+      renderOrders();
+    });
+    document.getElementById("add-station-btn").addEventListener("click", showStationForm);
+    document.getElementById("save-station-btn").addEventListener("click", saveStation);
+    document.getElementById("cancel-station-btn").addEventListener("click", () => {
+      document.getElementById("station-form").style.display = "none";
+    });
+
+    function initialize() {
+      renderOrders();
+      renderProducts();
+      renderStations();
+    }
+
+    initialize();
+  </script>
+</body>
+</html>
