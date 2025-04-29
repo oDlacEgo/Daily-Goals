@@ -82,8 +82,8 @@
     }
     .station-form .product-list {
       display: flex;
-      flex-direction: column; /* Produkty jeden pod drugim */
-      gap: 2px;              /* Odstępy między produktami */
+      flex-direction: column;
+      gap: 5px;
     }
     .station-form .product-row {
       display: flex;
@@ -109,13 +109,12 @@
       text-align: center;
     }
     #products-section {
-      display: none; /* Domyślnie ukryta sekcja produktów */
+      display: none;
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <!-- Sekcja zamówień i produktów -->
     <div class="left-section">
       <h2>Zamówienia</h2>
       <textarea id="order-input" placeholder="Wklej tutaj dane zamówień w formacie: Produkt[TAB]Data[TAB]Ilość"></textarea>
@@ -150,7 +149,6 @@
       </div>
     </div>
 
-    <!-- Sekcja stacji -->
     <div class="right-section">
       <h2>Stacje</h2>
       <div id="station-container" class="station-list"></div>
@@ -182,7 +180,6 @@
     const PRODUCT_STORAGE_KEY = "products";
     const STATION_STORAGE_KEY = "stations";
 
-    // Sekcja zamówień
     function renderOrders() {
       const orders = JSON.parse(localStorage.getItem(ORDER_STORAGE_KEY)) || [];
       const tbody = document.getElementById("order-summary").querySelector("tbody");
@@ -223,7 +220,6 @@
       renderOrders();
     }
 
-    // Sekcja produkty
     function renderProducts() {
       const products = JSON.parse(localStorage.getItem(PRODUCT_STORAGE_KEY)) || [];
       const productTableBody = document.getElementById("product-list").querySelector("tbody");
@@ -271,7 +267,6 @@
       }
     }
 
-    // Sekcja stacje
     function renderStations() {
       const stations = JSON.parse(localStorage.getItem(STATION_STORAGE_KEY)) || [];
       const stationList = document.getElementById("station-container");
@@ -282,14 +277,24 @@
         stationItem.innerHTML = `
           <h4>${station.name} (${station.hours}h)</h4>
           <ul>
-            ${station.products.map(
+            ${(station.products || []).map(
               p => `<li>${p.name} - ${p.ordersPerHour} zam./h</li>`
             ).join("")}
           </ul>
           <button onclick="editStation(${index})">Edytuj</button>
+          <button onclick="removeStation(${index})" style="background-color: #dc3545;">Usuń</button>
         `;
         stationList.appendChild(stationItem);
       });
+    }
+
+    function removeStation(index) {
+      const stations = JSON.parse(localStorage.getItem(STATION_STORAGE_KEY)) || [];
+      if (index >= 0 && index < stations.length) {
+        stations.splice(index, 1); 
+        localStorage.setItem(STATION_STORAGE_KEY, JSON.stringify(stations)); 
+        renderStations(); 
+      }
     }
 
     function editStation(index) {
